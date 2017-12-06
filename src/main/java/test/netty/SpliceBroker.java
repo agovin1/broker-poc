@@ -33,19 +33,24 @@ public class SpliceBroker {
 	public static void main(String[] args) throws Exception {
 
 		final int size = Integer.valueOf(args[0]);
-		EventLoopGroup group = new EpollEventLoopGroup(10);
+		EventLoopGroup group = new EpollEventLoopGroup(1);
+		EventLoopGroup group2 = new EpollEventLoopGroup(1);
 
 		ServerBootstrap serverBootstrap = new ServerBootstrap();
-		serverBootstrap.group(group).channel(EpollServerSocketChannel.class);
+		serverBootstrap.group(group, group2).channel(EpollServerSocketChannel.class);
 		serverBootstrap.childOption(EpollChannelOption.EPOLL_MODE, EpollMode.LEVEL_TRIGGERED);
+		serverBootstrap.childOption(ChannelOption.SO_RCVBUF, size);
+		serverBootstrap.childOption(ChannelOption.SO_SNDBUF, size);
 		serverBootstrap.childHandler(new ChannelInboundHandlerAdapter() {
 			@Override
 			public void channelActive(final ChannelHandlerContext ctx) throws Exception {
-
+				ctx.channel().config().setAutoRead(false);
 				Bootstrap bootstrap = new Bootstrap();
 				bootstrap.channel(EpollSocketChannel.class);
 				bootstrap.option(EpollChannelOption.EPOLL_MODE, EpollMode.LEVEL_TRIGGERED);
 				bootstrap.option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(size));
+				bootstrap.option(ChannelOption.SO_RCVBUF, size);
+				bootstrap.option(ChannelOption.SO_SNDBUF, size);
 				bootstrap.group(ctx.channel().eventLoop()).handler(new ChannelInboundHandlerAdapter() {
 
 					@Override
@@ -56,11 +61,11 @@ public class SpliceBroker {
 
 						System.out.println("checking size in bytes - "
 								+ context.channel().config().getRecvByteBufAllocator().newHandle().guess());
+
 						inChannel.spliceTo(outChannel, size).addListener(new ChannelFutureListener() {
 
 							public void operationComplete(ChannelFuture future) throws Exception {
-								System.out.println("Splicing to channel listener, " + size + " bytes "
-										+ LocalDateTime.now().toString());
+								System.out.println("Spliced " + size + " bytes " + LocalDateTime.now().toString());
 								if (!future.isSuccess()) {
 									future.channel().close();
 								} else {
@@ -69,6 +74,12 @@ public class SpliceBroker {
 							}
 						});
 
+						ctx.channel().config().setAutoRead(true);
+					}
+
+					@Override
+					public void channelInactive(ChannelHandlerContext context) throws Exception {
+						context.close();
 					}
 				});
 

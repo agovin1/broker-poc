@@ -60,7 +60,7 @@
 					</descriptorRefs>
 					<archive>
 						<manifest>
-							<mainClass>test.netty.CopyBroker</mainClass>
+							<mainClass>test.netty.TestBroker</mainClass>
 						</manifest>
 					</archive>
 
